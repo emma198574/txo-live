@@ -1,0 +1,139 @@
+<title>台指選擇權即時 T 字報價</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<style>
+:root{--bg:#f7f6f3;--panel:#fff;--ink:#1c1b19;--muted:#6b6862;--line:#e7e4dd;
+  --call:#c0392b;--put:#1e7a3c;--atm:#fff6d8;--hair:#efece5;}
+@media(prefers-color-scheme:dark){:root{--bg:#17181a;--panel:#1f2124;--ink:#ececec;
+  --muted:#9a9790;--line:#2e3033;--call:#ff6b5c;--put:#54c777;--atm:#3a3418;--hair:#26282b;}}
+:root[data-theme=dark]{--bg:#17181a;--panel:#1f2124;--ink:#ececec;--muted:#9a9790;
+  --line:#2e3033;--call:#ff6b5c;--put:#54c777;--atm:#3a3418;--hair:#26282b;}
+:root[data-theme=light]{--bg:#f7f6f3;--panel:#fff;--ink:#1c1b19;--muted:#6b6862;
+  --line:#e7e4dd;--call:#c0392b;--put:#1e7a3c;--atm:#fff6d8;--hair:#efece5;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,"PingFang TC","Helvetica Neue",Arial,sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 14px 60px;}
+h1{font-size:20px;margin:0 0 4px;font-weight:700;letter-spacing:.3px}
+.sub{color:var(--muted);font-size:12.5px;margin-bottom:6px;line-height:1.6}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e0392b;margin-right:6px;
+  vertical-align:middle;animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.dot{animation:none}}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:14px 0}
+@media(max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpi .l{font-size:10.5px;color:var(--muted);letter-spacing:.4px;margin-bottom:4px}
+.kpi .v{font-size:18px;font-weight:700} .kpi .v small{font-size:11px;font-weight:500;color:var(--muted)}
+.kpi.call .v{color:var(--call)} .kpi.put .v{color:var(--put)}
+.tblwrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:860px}
+thead th{position:sticky;top:0;background:var(--panel);color:var(--muted);font-weight:600;
+  font-size:10.5px;letter-spacing:.3px;padding:8px 7px;border-bottom:2px solid var(--line)}
+.grp-c{color:var(--call)} .grp-p{color:var(--put)}
+.drow td{padding:4px 7px;border-bottom:1px solid var(--hair);text-align:right;white-space:nowrap}
+.strike{text-align:center!important;font-weight:700;background:var(--bg);
+  border-left:1px solid var(--line);border-right:1px solid var(--line)}
+.be,.oi{color:var(--muted)} .px{font-weight:600}
+.e{background:transparent!important}
+.drow.atm .strike{background:var(--atm)}
+.drow.atm td{border-top:1px solid #d8b24a;border-bottom:1px solid #d8b24a}
+.note{color:var(--muted);font-size:11.5px;line-height:1.75;margin-top:16px}
+.note b{color:var(--ink)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:10px 2px 0}
+.sw{display:inline-block;width:24px;height:10px;border-radius:2px;vertical-align:middle;margin-right:5px}
+</style>
+<div class="wrap">
+<h1>台指選擇權即時 T 字報價</h1>
+<div class="sub"><span class="dot"></span>夜盤　行情時間 21:51:15　·　7月 週選(TXY)　·　標的 44,380（TXF近月(夜盤)）　·　產生 2026-07-23 21:51:16</div>
+<div class="kpis">
+  <div class="kpi call"><div class="l">CALL 成交量</div><div class="v">63,327<small> 口</small></div></div>
+  <div class="kpi put"><div class="l">PUT 成交量</div><div class="v">58,421<small> 口</small></div></div>
+  <div class="kpi"><div class="l">Put/Call 量比</div><div class="v">0.92</div></div>
+  <div class="kpi"><div class="l">P/C 未平倉比</div><div class="v">1.20</div></div>
+  <div class="kpi"><div class="l">價平</div><div class="v">44,400</div></div>
+</div>
+<div class="tblwrap">
+<table>
+<thead><tr>
+  <th class="grp-c">CALL 金額</th><th class="grp-c">口數</th><th class="grp-c">OI</th><th class="grp-c">權利金</th><th class="grp-c">損益兩平</th>
+  <th>履約價</th>
+  <th class="grp-p">損益兩平</th><th class="grp-p">權利金</th><th class="grp-p">OI</th><th class="grp-p">口數</th><th class="grp-p">PUT 金額</th>
+</tr></thead>
+<tbody>
+<tr class="drow"><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="strike">42,900</td><td class="be">42,862</td><td class="px">37.5</td><td class="oi">696</td><td class="vol">822</td><td class="amt" style="background:rgb(227,243,232)">1,541,250</td></tr>
+<tr class="drow"><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="strike">42,950</td><td class="be">42,915</td><td class="px">35</td><td class="oi">148</td><td class="vol">515</td><td class="amt" style="background:rgb(234,246,238)">901,250</td></tr>
+<tr class="drow"><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="strike">43,000</td><td class="be">42,959</td><td class="px">41</td><td class="oi">1,918</td><td class="vol">3,578</td><td class="amt" style="background:rgb(189,227,201)">7,334,900</td></tr>
+<tr class="drow"><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="strike">43,050</td><td class="be">43,005</td><td class="px">45</td><td class="oi">196</td><td class="vol">640</td><td class="amt" style="background:rgb(228,243,233)">1,440,000</td></tr>
+<tr class="drow"><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="strike">43,100</td><td class="be">43,052</td><td class="px">48.5</td><td class="oi">524</td><td class="vol">1,250</td><td class="amt" style="background:rgb(214,238,221)">3,031,250</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(253,248,248)">47,000</td><td class="vol">1</td><td class="oi"></td><td class="px">940</td><td class="be">44,090</td><td class="strike">43,150</td><td class="be">43,092</td><td class="px">58</td><td class="oi">499</td><td class="vol">763</td><td class="amt" style="background:rgb(221,240,227)">2,212,700</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(252,241,241)">149,250</td><td class="vol">3</td><td class="oi">15</td><td class="px">995</td><td class="be">44,195</td><td class="strike">43,200</td><td class="be">43,143</td><td class="px">57</td><td class="oi">520</td><td class="vol">1,307</td><td class="amt" style="background:rgb(209,235,217)">3,724,950</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(252,240,240)">186,000</td><td class="vol">4</td><td class="oi">8</td><td class="px">930</td><td class="be">44,180</td><td class="strike">43,250</td><td class="be">43,189</td><td class="px">61</td><td class="oi">136</td><td class="vol">765</td><td class="amt" style="background:rgb(220,240,226)">2,333,250</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(251,239,239)">201,250</td><td class="vol">5</td><td class="oi">214</td><td class="px">805</td><td class="be">44,105</td><td class="strike">43,300</td><td class="be">43,234</td><td class="px">66</td><td class="oi">638</td><td class="vol">1,577</td><td class="amt" style="background:rgb(200,232,210)">5,204,100</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(251,237,237)">253,500</td><td class="vol">6</td><td class="oi">6</td><td class="px">845</td><td class="be">44,195</td><td class="strike">43,350</td><td class="be">43,277</td><td class="px">73</td><td class="oi">134</td><td class="vol">825</td><td class="amt" style="background:rgb(214,238,222)">3,011,250</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(250,233,233)">365,000</td><td class="vol">10</td><td class="oi">11</td><td class="px">730</td><td class="be">44,130</td><td class="strike">43,400</td><td class="be">43,319</td><td class="px">81</td><td class="oi">532</td><td class="vol">1,606</td><td class="amt" style="background:rgb(193,229,204)">6,504,300</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(253,247,247)">52,000</td><td class="vol">1</td><td class="oi">17</td><td class="px">1040</td><td class="be">44,490</td><td class="strike">43,450</td><td class="be">43,361</td><td class="px">89</td><td class="oi">110</td><td class="vol">753</td><td class="amt" style="background:rgb(212,237,220)">3,350,850</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(242,190,190)">2,706,000</td><td class="vol">66</td><td class="oi">467</td><td class="px">820</td><td class="be">44,320</td><td class="strike">43,500</td><td class="be">43,403</td><td class="px">97</td><td class="oi">1,312</td><td class="vol">3,042</td><td class="amt" style="background:rgb(158,214,176)">14,753,700</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(252,240,240)">183,000</td><td class="vol">6</td><td class="oi">7</td><td class="px">610</td><td class="be">44,160</td><td class="strike">43,550</td><td class="be">43,440</td><td class="px">110</td><td class="oi">199</td><td class="vol">942</td><td class="amt" style="background:rgb(200,232,210)">5,181,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(246,210,210)">1,364,000</td><td class="vol">44</td><td class="oi">211</td><td class="px">620</td><td class="be">44,220</td><td class="strike">43,600</td><td class="be">43,491</td><td class="px">109</td><td class="oi">671</td><td class="vol">1,916</td><td class="amt" style="background:rgb(175,221,189)">10,442,200</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(243,197,197)">2,184,000</td><td class="vol">56</td><td class="oi">17</td><td class="px">780</td><td class="be">44,430</td><td class="strike">43,650</td><td class="be">43,529</td><td class="px">121</td><td class="oi">178</td><td class="vol">1,116</td><td class="amt" style="background:rgb(192,228,203)">6,751,800</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(233,148,148)">6,783,750</td><td class="vol">201</td><td class="oi">24</td><td class="px">675</td><td class="be">44,375</td><td class="strike">43,700</td><td class="be">43,568</td><td class="px">132</td><td class="oi">598</td><td class="vol">2,253</td><td class="amt" style="background:rgb(158,214,175)">14,869,800</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(251,235,235)">313,500</td><td class="vol">11</td><td class="oi">3</td><td class="px">570</td><td class="be">44,320</td><td class="strike">43,750</td><td class="be">43,601</td><td class="px">149</td><td class="oi">112</td><td class="vol">1,153</td><td class="amt" style="background:rgb(183,224,196)">8,589,850</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(237,169,169)">4,522,000</td><td class="vol">152</td><td class="oi">21</td><td class="px">595</td><td class="be">44,395</td><td class="strike">43,800</td><td class="be">43,641</td><td class="px">159</td><td class="oi">367</td><td class="vol">2,112</td><td class="amt" style="background:rgb(151,211,170)">16,790,400</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(238,173,173)">4,209,250</td><td class="vol">149</td><td class="oi">10</td><td class="px">565</td><td class="be">44,415</td><td class="strike">43,850</td><td class="be">43,680</td><td class="px">170</td><td class="oi">142</td><td class="vol">925</td><td class="amt" style="background:rgb(187,226,199)">7,862,500</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(233,147,147)">6,875,000</td><td class="vol">275</td><td class="oi">32</td><td class="px">500</td><td class="be">44,400</td><td class="strike">43,900</td><td class="be">43,720</td><td class="px">180</td><td class="oi">357</td><td class="vol">1,886</td><td class="amt" style="background:rgb(151,211,169)">16,974,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(235,156,156)">5,929,000</td><td class="vol">245</td><td class="oi">10</td><td class="px">484</td><td class="be">44,434</td><td class="strike">43,950</td><td class="be">43,750</td><td class="px">200</td><td class="oi">191</td><td class="vol">936</td><td class="amt" style="background:rgb(180,223,193)">9,360,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(217,69,69)">18,540,000</td><td class="vol">824</td><td class="oi">221</td><td class="px">450</td><td class="be">44,450</td><td class="strike">44,000</td><td class="be">43,780</td><td class="px">220</td><td class="oi">1,465</td><td class="vol">6,304</td><td class="amt" style="background:rgb(30,160,70)">69,344,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(241,185,185)">3,095,950</td><td class="vol">143</td><td class="oi">13</td><td class="px">433</td><td class="be">44,483</td><td class="strike">44,050</td><td class="be">43,813</td><td class="px">237</td><td class="oi">143</td><td class="vol">841</td><td class="amt" style="background:rgb(177,222,191)">9,965,850</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(226,112,112)">11,485,600</td><td class="vol">586</td><td class="oi">34</td><td class="px">392</td><td class="be">44,492</td><td class="strike">44,100</td><td class="be">43,845</td><td class="px">255</td><td class="oi">373</td><td class="vol">1,726</td><td class="amt" style="background:rgb(135,204,156)">22,006,500</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(234,152,152)">6,372,400</td><td class="vol">358</td><td class="oi">22</td><td class="px">356</td><td class="be">44,506</td><td class="strike">44,150</td><td class="be">43,868</td><td class="px">282</td><td class="oi">139</td><td class="vol">833</td><td class="amt" style="background:rgb(170,219,185)">11,745,300</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(220,86,86)">15,581,800</td><td class="vol">922</td><td class="oi">102</td><td class="px">338</td><td class="be">44,538</td><td class="strike">44,200</td><td class="be">43,902</td><td class="px">298</td><td class="oi">395</td><td class="vol">2,208</td><td class="amt" style="background:rgb(105,191,132)">32,899,200</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(228,122,122)">10,100,300</td><td class="vol">658</td><td class="oi">35</td><td class="px">307</td><td class="be">44,557</td><td class="strike">44,250</td><td class="be">43,915</td><td class="px">335</td><td class="oi">196</td><td class="vol">880</td><td class="amt" style="background:rgb(158,214,176)">14,740,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(216,63,63)">19,693,500</td><td class="vol">1,382</td><td class="oi">77</td><td class="px">285</td><td class="be">44,585</td><td class="strike">44,300</td><td class="be">43,956</td><td class="px">344</td><td class="oi">555</td><td class="vol">1,966</td><td class="amt" style="background:rgb(103,190,130)">33,815,200</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(235,156,156)">5,848,300</td><td class="vol">466</td><td class="oi">67</td><td class="px">251</td><td class="be">44,601</td><td class="strike">44,350</td><td class="be">43,979</td><td class="px">371</td><td class="oi">197</td><td class="vol">738</td><td class="amt" style="background:rgb(162,216,179)">13,689,900</td></tr>
+<tr class="drow atm"><td class="amt" style="background:rgb(220,82,82)">16,305,900</td><td class="vol">1,443</td><td class="oi">184</td><td class="px">226</td><td class="be">44,626</td><td class="strike">44,400</td><td class="be">44,008</td><td class="px">392</td><td class="oi">573</td><td class="vol">1,555</td><td class="amt" style="background:rgb(111,194,137)">30,478,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(233,150,150)">6,499,500</td><td class="vol">619</td><td class="oi">60</td><td class="px">210</td><td class="be">44,660</td><td class="strike">44,450</td><td class="be">44,023</td><td class="px">427</td><td class="oi">279</td><td class="vol">831</td><td class="amt" style="background:rgb(148,210,167)">17,741,850</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(215,58,58)">20,563,200</td><td class="vol">2,176</td><td class="oi">539</td><td class="px">189</td><td class="be">44,689</td><td class="strike">44,500</td><td class="be">44,055</td><td class="px">445</td><td class="oi">820</td><td class="vol">2,434</td><td class="amt" style="background:rgb(58,172,93)">54,156,500</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(231,136,136)">8,236,500</td><td class="vol">969</td><td class="oi">78</td><td class="px">170</td><td class="be">44,720</td><td class="strike">44,550</td><td class="be">44,070</td><td class="px">480</td><td class="oi">175</td><td class="vol">629</td><td class="amt" style="background:rgb(157,213,175)">15,096,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(223,98,98)">13,611,900</td><td class="vol">1,734</td><td class="oi">305</td><td class="px">157</td><td class="be">44,757</td><td class="strike">44,600</td><td class="be">44,065</td><td class="px">535</td><td class="oi">242</td><td class="vol">1,213</td><td class="amt" style="background:rgb(106,192,133)">32,447,750</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(230,135,135)">8,328,300</td><td class="vol">1,207</td><td class="oi">107</td><td class="px">138</td><td class="be">44,788</td><td class="strike">44,650</td><td class="be">44,095</td><td class="px">555</td><td class="oi">118</td><td class="vol">495</td><td class="amt" style="background:rgb(162,216,179)">13,736,250</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(220,85,85)">15,731,250</td><td class="vol">2,517</td><td class="oi">395</td><td class="px">125</td><td class="be">44,825</td><td class="strike">44,700</td><td class="be">44,125</td><td class="px">575</td><td class="oi">452</td><td class="vol">988</td><td class="amt" style="background:rgb(117,196,141)">28,405,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(233,149,149)">6,601,900</td><td class="vol">1,234</td><td class="oi">168</td><td class="px">107</td><td class="be">44,857</td><td class="strike">44,750</td><td class="be">44,105</td><td class="px">645</td><td class="oi">134</td><td class="vol">360</td><td class="amt" style="background:rgb(170,219,185)">11,610,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(214,52,52)">21,888,050</td><td class="vol">4,513</td><td class="oi">857</td><td class="px">97</td><td class="be">44,897</td><td class="strike">44,800</td><td class="be">44,120</td><td class="px">680</td><td class="oi">486</td><td class="vol">1,290</td><td class="amt" style="background:rgb(80,181,111)">43,860,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(230,134,134)">8,478,750</td><td class="vol">1,995</td><td class="oi">199</td><td class="px">85</td><td class="be">44,935</td><td class="strike">44,850</td><td class="be">44,140</td><td class="px">710</td><td class="oi">66</td><td class="vol">406</td><td class="amt" style="background:rgb(160,214,177)">14,413,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(229,130,130)">8,939,200</td><td class="vol">2,416</td><td class="oi">449</td><td class="px">74</td><td class="be">44,974</td><td class="strike">44,900</td><td class="be">44,150</td><td class="px">750</td><td class="oi">151</td><td class="vol">496</td><td class="amt" style="background:rgb(145,208,165)">18,600,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(237,170,170)">4,428,600</td><td class="vol">1,342</td><td class="oi">156</td><td class="px">66</td><td class="be">45,016</td><td class="strike">44,950</td><td class="be">44,175</td><td class="px">775</td><td class="oi">85</td><td class="vol">239</td><td class="amt" style="background:rgb(180,223,193)">9,261,250</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(216,65,65)">19,303,050</td><td class="vol">6,773</td><td class="oi">1,550</td><td class="px">57</td><td class="be">45,057</td><td class="strike">45,000</td><td class="be">44,160</td><td class="px">840</td><td class="oi">631</td><td class="vol">704</td><td class="amt" style="background:rgb(114,195,139)">29,568,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(238,171,171)">4,356,000</td><td class="vol">1,760</td><td class="oi">256</td><td class="px">49.5</td><td class="be">45,100</td><td class="strike">45,050</td><td class="be">44,040</td><td class="px">1010</td><td class="oi">46</td><td class="vol">162</td><td class="amt" style="background:rgb(185,225,197)">8,181,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(236,165,165)">4,930,725</td><td class="vol">2,267</td><td class="oi">425</td><td class="px">43.5</td><td class="be">45,144</td><td class="strike">45,100</td><td class="be">44,155</td><td class="px">945</td><td class="oi">339</td><td class="vol">188</td><td class="amt" style="background:rgb(182,224,195)">8,883,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(244,203,203)">1,805,000</td><td class="vol">950</td><td class="oi">207</td><td class="px">38</td><td class="be">45,188</td><td class="strike">45,150</td><td class="be">44,315</td><td class="px">835</td><td class="oi">22</td><td class="vol">31</td><td class="amt" style="background:rgb(229,244,234)">1,294,250</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(236,161,161)">5,332,950</td><td class="vol">3,386</td><td class="oi">610</td><td class="px">31.5</td><td class="be">45,232</td><td class="strike">45,200</td><td class="be">43,970</td><td class="px">1230</td><td class="oi">67</td><td class="vol">68</td><td class="amt" style="background:rgb(206,234,215)">4,182,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(244,203,203)">1,782,200</td><td class="vol">1,273</td><td class="oi">321</td><td class="px">28</td><td class="be">45,278</td><td class="strike">45,250</td><td class="be">44,230</td><td class="px">1020</td><td class="oi">63</td><td class="vol">39</td><td class="amt" style="background:rgb(223,241,228)">1,989,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(240,182,182)">3,338,450</td><td class="vol">2,903</td><td class="oi">881</td><td class="px">23</td><td class="be">45,323</td><td class="strike">45,300</td><td class="be">44,300</td><td class="px">1000</td><td class="oi">37</td><td class="vol">33</td><td class="amt" style="background:rgb(226,242,231)">1,650,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(247,215,215)">1,093,450</td><td class="vol">1,151</td><td class="oi">480</td><td class="px">19</td><td class="be">45,369</td><td class="strike">45,350</td><td class="be">44,715</td><td class="px">635</td><td class="oi">13</td><td class="vol">9</td><td class="amt" style="background:rgb(244,250,245)">285,750</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(243,197,197)">2,215,950</td><td class="vol">2,686</td><td class="oi">719</td><td class="px">16.5</td><td class="be">45,416</td><td class="strike">45,400</td><td class="be">44,390</td><td class="px">1010</td><td class="oi">45</td><td class="vol">13</td><td class="amt" style="background:rgb(237,247,240)">656,500</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(249,226,226)">623,700</td><td class="vol">924</td><td class="oi">484</td><td class="px">13.5</td><td class="be">45,464</td><td class="strike">45,450</td><td class="be">44,220</td><td class="px">1230</td><td class="oi">5</td><td class="vol">9</td><td class="amt" style="background:rgb(239,248,242)">553,500</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(243,199,199)">2,095,875</td><td class="vol">3,645</td><td class="oi">1,747</td><td class="px">11.5</td><td class="be">45,512</td><td class="strike">45,500</td><td class="be">44,070</td><td class="px">1430</td><td class="oi">58</td><td class="vol">26</td><td class="amt" style="background:rgb(224,242,229)">1,859,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(250,233,233)">375,300</td><td class="vol">834</td><td class="oi">386</td><td class="px">9</td><td class="be">45,559</td><td class="strike">45,550</td><td class="be">44,230</td><td class="px">1320</td><td class="oi">4</td><td class="vol">2</td><td class="amt" style="background:rgb(247,251,249)">132,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(248,221,221)">838,000</td><td class="vol">1,676</td><td class="oi">1,143</td><td class="px">10</td><td class="be">45,610</td><td class="strike">45,600</td><td class="be">44,000</td><td class="px">1600</td><td class="oi">50</td><td class="vol">21</td><td class="amt" style="background:rgb(225,242,231)">1,680,000</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(251,237,237)">256,900</td><td class="vol">734</td><td class="oi">293</td><td class="px">7</td><td class="be">45,657</td><td class="strike">45,650</td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(250,230,230)">468,325</td><td class="vol">1,441</td><td class="oi">896</td><td class="px">6.5</td><td class="be">45,706</td><td class="strike">45,700</td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(252,241,241)">167,010</td><td class="vol">586</td><td class="oi">234</td><td class="px">5.7</td><td class="be">45,756</td><td class="strike">45,750</td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(251,237,237)">258,860</td><td class="vol">1,204</td><td class="oi">1,457</td><td class="px">4.3</td><td class="be">45,804</td><td class="strike">45,800</td><td class="be">44,510</td><td class="px">1290</td><td class="oi">60</td><td class="vol">1</td><td class="amt" style="background:rgb(250,252,251)">64,500</td></tr>
+<tr class="drow"><td class="amt" style="background:rgb(252,244,244)">106,650</td><td class="vol">395</td><td class="oi">270</td><td class="px">5.4</td><td class="be">45,855</td><td class="strike">45,850</td><td class="be">44,410</td><td class="px">1440</td><td class="oi">4</td><td class="vol">1</td><td class="amt" style="background:rgb(249,252,250)">72,000</td></tr>
+</tbody>
+</table>
+</div>
+<div class="legend">
+  <span><span class="sw" style="background:linear-gradient(90deg,#fff,rgb(214,52,52))"></span>買權金額</span>
+  <span><span class="sw" style="background:linear-gradient(90deg,#fff,rgb(30,160,70))"></span>賣權金額</span>
+  <span><span class="sw" style="background:var(--atm);border:1px solid #d8b24a"></span>價平</span>
+  <span>網頁每 60 秒自動重新整理</span>
+</div>
+<div class="note">
+  <b>即時欄位</b>（MIS）：權利金、口數、金額、損益兩平；金額 = 權利金 × 50 × 口數。<br>
+  <b>今日重點</b>：買權最大量 45,000（6,773 口）、賣權最大量 44,000（6,304 口）。未平倉牆（07/23 收盤）：買權壓力 <b>46,000</b>、賣權支撐 <b>42,000</b>、Put/Call 未平倉比 <b>1.20</b>。<br>
+  <b>限制</b>：OI 為期交所盤後公布，盤中沿用前一日；此表為 TAIFEX MIS 約每 5 秒的準即時報價，非逐筆。
+</div>
+</div>

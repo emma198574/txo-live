@@ -1,0 +1,56 @@
+name: 選擇權即時T字報價
+
+# 台北時間對照（GitHub cron 用 UTC，UTC+8）：
+#   日盤 08:45–13:45 → UTC 00:45–05:45
+#   夜盤 15:00–次日05:00 → UTC 07:00–21:00（同一 UTC 日）
+# 網頁每 5 分鐘自動更新；推播僅在手動觸發（workflow_dispatch）時發送。
+on:
+  schedule:
+    - cron: '*/5 0-5 * * 1-5'     # 日盤
+    - cron: '*/5 7-21 * * 1-5'    # 夜盤
+  workflow_dispatch:
+    inputs:
+      notify:
+        description: '同時推播摘要到 iPhone (ntfy)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時只跑一個部署；不取消進行中的（部署很快，5 分鐘間隔足夠）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝套件
+        run: pip install requests
+
+      - name: 產生即時 T 字報價網頁
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PAGE_URL:   ${{ vars.PAGE_URL }}
+        run: |
+          python3 "即時選擇權T字報價.py" --out public/index.html ${{ (github.event_name == 'workflow_dispatch' && inputs.notify) && '--notify' || '' }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deploy
+        uses: actions/deploy-pages@v4

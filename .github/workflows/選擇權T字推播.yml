@@ -1,0 +1,26 @@
+name: 選擇權即時T字推播
+
+# 私有 repo 也能用，不需要 GitHub Pages。抓 MIS 即時報價 → 推播摘要到 iPhone (ntfy)。
+# 沿用你既有的 NTFY_TOPIC secret，不用另外設定。
+# cron 用 UTC（台北 = UTC + 8）：
+on:
+  workflow_dispatch:          # Actions 頁面手動 Run 隨時推一次
+  schedule:
+    - cron: '5 1 * * 1-5'     # 台北 09:05 日盤開盤後
+    - cron: '30 3 * * 1-5'    # 台北 11:30 日盤盤中
+    - cron: '35 5 * * 1-5'    # 台北 13:35 日盤收盤前
+    - cron: '0 12 * * 1-5'    # 台北 20:00 夜盤
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests tzdata
+      - name: 抓即時報價並推播
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 "即時選擇權T字報價.py" --out /tmp/txo.html --notify
