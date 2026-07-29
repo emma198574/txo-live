@@ -299,6 +299,10 @@ DELTA_JS = """
     s.style.display = 'inline-block';
   });
 })();
+// 每 60 秒帶時間戳重新載入：繞過 iPhone 主畫面 App 與 CDN 的快取，永遠抓最新那版。
+setTimeout(function(){
+  location.replace(location.pathname + '?t=' + Date.now());
+}, 60000);
 </script>
 """
 
@@ -376,7 +380,7 @@ def render_html(rep):
 
     return f'''<title>台指選擇權即時 T 字報價</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="60">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <style>
 :root{{--bg:#f7f6f3;--panel:#fff;--ink:#1c1b19;--muted:#6b6862;--line:#e7e4dd;
   --call:#c0392b;--put:#1e7a3c;--atm:#fff6d8;--hair:#efece5;}}
