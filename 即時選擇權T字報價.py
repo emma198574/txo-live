@@ -260,6 +260,48 @@ def heat(amt, mx, base):
 CALL_BASE = (214, 52, 52)
 PUT_BASE  = (30, 160, 70)
 
+# 在瀏覽器端用 localStorage 記住上一版（上一個「產生時間」）的金額，
+# 每次載入就地算出各履約價金額相對上一版的增減（▲紅=增加、▼綠=減少）。
+# 雲端每 5 分鐘換一版新資料、網頁每 60 秒重整；同一版重整不會洗掉差額。
+DELTA_JS = """
+<script>
+(function(){
+  var wrap = document.querySelector('.wrap');
+  if(!wrap) return;
+  var GEN = wrap.getAttribute('data-gen') || '';
+  var cells = [].slice.call(document.querySelectorAll('td.amt[data-amt]'));
+  var cur = {};
+  cells.forEach(function(td){
+    cur[td.getAttribute('data-side') + ':' + td.getAttribute('data-k')] = +td.getAttribute('data-amt');
+  });
+  var prev = null;
+  try { prev = JSON.parse(localStorage.getItem('txo_snap') || 'null'); } catch(e){}
+  var base = null;
+  if(!prev){
+    localStorage.setItem('txo_snap', JSON.stringify({gen:GEN, cur:cur, base:cur}));
+  } else if(prev.gen === GEN){
+    base = prev.base;                        // 同一版重整：沿用既有基準
+  } else {
+    base = prev.cur;                         // 換新版：上一版數字成為新基準
+    localStorage.setItem('txo_snap', JSON.stringify({gen:GEN, cur:cur, base:prev.cur}));
+  }
+  if(!base) return;                          // 第一次看：尚無可比較的基準
+  function fmt(n){ return n.toLocaleString('en-US'); }
+  cells.forEach(function(td){
+    var key = td.getAttribute('data-side') + ':' + td.getAttribute('data-k');
+    if(!(key in base)) return;
+    var d = cur[key] - base[key];
+    if(!d) return;
+    var s = td.querySelector('.delta');
+    if(!s) return;
+    s.textContent = (d > 0 ? '▲ ' : '▼ ') + fmt(Math.abs(d));
+    s.className = 'delta ' + (d > 0 ? 'up' : 'down');
+    s.style.display = 'inline-block';
+  });
+})();
+</script>
+"""
+
 
 def render_html(rep):
     crows, prows = rep["crows"], rep["prows"]
@@ -293,7 +335,8 @@ def render_html(rep):
         p_oiv = oi["P"].get(k) if oi else None
         if c:
             bg = heat(c["amt"], cmax, CALL_BASE)
-            cc = (f'<td class="amt" style="background:{bg}">{fmt(c["amt"])}</td>'
+            cc = (f'<td class="amt" data-side="C" data-k="{k}" data-amt="{c["amt"]}" style="background:{bg}">'
+                  f'<span class="amtnum">{fmt(c["amt"])}</span><span class="delta"></span></td>'
                   f'<td class="vol">{fmt(c["vol"])}</td>'
                   f'<td class="oi">{fmt(c_oiv) if c_oiv else ""}</td>'
                   f'<td class="px">{c["px"]:g}</td>'
@@ -306,7 +349,8 @@ def render_html(rep):
                   f'<td class="px">{p["px"]:g}</td>'
                   f'<td class="oi">{fmt(p_oiv) if p_oiv else ""}</td>'
                   f'<td class="vol">{fmt(p["vol"])}</td>'
-                  f'<td class="amt" style="background:{bg}">{fmt(p["amt"])}</td>')
+                  f'<td class="amt" data-side="P" data-k="{k}" data-amt="{p["amt"]}" style="background:{bg}">'
+                  f'<span class="amtnum">{fmt(p["amt"])}</span><span class="delta"></span></td>')
         else:
             pc = '<td class="e"></td>'*5
         trs.append(f'<tr class="drow{atm_cls}">{cc}<td class="strike">{k:,}</td>{pc}</tr>')
@@ -368,6 +412,10 @@ thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-
 .strike{{text-align:center!important;font-weight:700;background:var(--bg);
   border-left:1px solid var(--line);border-right:1px solid var(--line)}}
 .be,.oi{{color:var(--muted)}} .px{{font-weight:600}}
+.amt .amtnum{{display:block}}
+.delta{{display:none;font-size:9.5px;font-weight:700;line-height:1.4;margin-top:1px;
+  padding:0 4px;border-radius:3px;background:rgba(0,0,0,.34);letter-spacing:.2px}}
+.delta.up{{color:#ff6a5c}} .delta.down{{color:#37d67a}}
 .e{{background:transparent!important}}
 .drow.atm .strike{{background:var(--atm)}}
 .drow.atm td{{border-top:1px solid #d8b24a;border-bottom:1px solid #d8b24a}}
@@ -376,7 +424,7 @@ thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-
 .legend{{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:10px 2px 0}}
 .sw{{display:inline-block;width:24px;height:10px;border-radius:2px;vertical-align:middle;margin-right:5px}}
 </style>
-<div class="wrap">
+<div class="wrap" data-gen="{rep["now"]}">
 <h1>台指選擇權即時 T 字報價</h1>
 <div class="sub"><span class="dot"></span>{sess_txt}　·　{wk_label(rep["mon"], rep["root"])}　·　標的 {rep["under"]:,.0f}（{rep["usrc"]}）　·　產生 {rep["now"]}</div>
 <div class="kpis">
@@ -402,6 +450,7 @@ thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-
   <span><span class="sw" style="background:linear-gradient(90deg,#fff,rgb(214,52,52))"></span>買權金額</span>
   <span><span class="sw" style="background:linear-gradient(90deg,#fff,rgb(30,160,70))"></span>賣權金額</span>
   <span><span class="sw" style="background:var(--atm);border:1px solid #d8b24a"></span>價平</span>
+  <span><b style="color:#ff6a5c">▲</b> 金額較上次增加　<b style="color:#37d67a">▼</b> 金額較上次減少</span>
   <span>網頁每 60 秒自動重新整理</span>
 </div>
 <div class="note">
@@ -409,7 +458,7 @@ thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-
   <b>今日重點</b>：買權最大量 {ctop_txt}、賣權最大量 {ptop_txt}。{oi_note}<br>
   <b>限制</b>：OI 為期交所盤後公布，盤中沿用前一日；此表為 TAIFEX MIS 約每 5 秒的準即時報價，非逐筆。
 </div>
-</div>'''
+</div>''' + DELTA_JS
 
 
 # ── 6. ntfy 推播 ─────────────────────────────────────────────────────────────
