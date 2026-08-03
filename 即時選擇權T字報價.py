@@ -188,6 +188,14 @@ def collect_groups(quote_list, night=False):
             "vol": vol,
             "bid": _num(it.get("CBidPrice1")),
             "ask": _num(it.get("CAskPrice1")),
+            # 今日相對昨收的權利金變動。MIS 直接給，不必自己存快照比對，
+            # 而且是「今日累積」而非上一版的 5 分鐘差，訊號比 ▲▼ 強。
+            "ref":  _num(it.get("CRefPrice")),
+            "diff": _num(it.get("CDiff")),
+            "rate": _num(it.get("CDiffRate")),
+            "open": _num(it.get("COpenPrice")),
+            "high": _num(it.get("CHighPrice")),
+            "low":  _num(it.get("CLowPrice")),
         }
         groups[gkey]["vol"] += vol
         if not groups[gkey]["exp"]:
@@ -337,6 +345,147 @@ def group_fwd(grp):
     return atm_parity + calls[atm_parity]["px"] - puts[atm_parity]["px"]
 
 
+def _median(xs):
+    xs = sorted(xs)
+    n = len(xs)
+    if not n:
+        return None
+    return xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
+
+
+def moneyness(k, under, is_call):
+    """價內 in-the-money／價外 out-of-the-money。買權履約價低於標的為價內，賣權相反。"""
+    itm = (k < under) if is_call else (k > under)
+    return "itm" if itm else "otm"
+
+
+MONEY_TXT = {"itm": "價內", "otm": "價外"}
+
+
+def add_excess(rows, under, is_call):
+    """
+    算「超額漲跌」：該履約價今日漲跌% 減掉「同側、同價內外」履約價漲跌%的中位數。
+
+    為什麼不能直接看漲跌%：指數一漲，全部 CALL 一起漲、全部 PUT 一起跌，
+    那是方向 beta，不是誰在這個履約價出手。扣掉中位數之後剩下的，
+    才是這一檔相對同儕的異常強弱 —— 跌得比同儕兇 = 有人在壓價收租（築牆），
+    漲得比同儕兇 = 有人在追價（想突破）。跟細族群輪動要剔除大盤 beta 同一個道理。
+
+    為什麼還要分價內／價外：兩者的 % 變動根本不是同一種東西。價內權利金主要跟著
+    內含價值走（指數跌 1,000 點，價內賣權就多 1,000 點內含價值），價外動的則是
+    時間價值與隱含波動率，基數又小，%天生大得多。把兩群混在一起取中位數，
+    等於拿內含價值的變動去當時間價值的基準，價內檔會被系統性誤判。
+
+    顯著與否用 |超額| 的中位數當尺度（MAD 概念），自適應盤中波動大小，不硬編閾值。
+    每一組各自算自己的中位數與尺度；樣本不足 MIN_GROUP_N 檔就整組不判定 ——
+    分組後樣本變少，三五檔算出來的中位數沒有代表性，寧可留白也不要給假訊號。
+    """
+    # 沒成交的檔位 rate 可能是前一筆的陳舊值，不能拿來定基準
+    live = [r for r in rows.values() if r["rate"] is not None and r["vol"] > 0]
+    for r in rows.values():
+        r["tag"] = ""
+        r.setdefault("excess", None)
+        r.setdefault("grp", "")
+    if not live:
+        return
+
+    # 量門檻取「整側總量 1%」與絕對下限的較大值。只用相對門檻會在清淡時失效：
+    # 剛掛牌的週選一側可能總共才 24 口，1% = 0.24 口，於是 1 口成交就被當成大戶，
+    # 判出「賣方築牆」。單一履約價要有解讀價值，先得有起碼的口數。
+    vol_gate = max((sum(r["vol"] for r in live) or 1) * 0.01, MIN_TAG_VOL)
+
+    for g in ("itm", "otm"):
+        grp = [r for r in live if moneyness(r["K"], under, is_call) == g]
+        # 基準只用量夠大的檔算，且判定對象就是同一批。兩者必須對齊：
+        # 冷門檔的報價更新慢，跟不上最新行情，拿它們一起算中位數會把基準拖低，
+        # 結果量大的檔全部呈現正超額 —— 那是基準偏掉，不是市場真的在追價。
+        core = [r for r in grp if r["vol"] >= vol_gate]
+        if len(core) < MIN_GROUP_N:
+            continue
+        med = _median([r["rate"] for r in core])
+        scale = max((_median([abs(r["rate"] - med) for r in core]) or 1.0) * EXCESS_K,
+                    MIN_EXCESS_PT)
+        for r in grp:                      # 超額全組都算，冷門檔也看得到自己的位置
+            r["excess"] = r["rate"] - med
+            r["grp"] = g
+        for r in core:                     # 但只有量夠大的才下買賣方判定
+            if r["excess"] <= -scale:
+                r["tag"] = "sell"    # 相對同儕被壓 → 賣方築牆
+            elif r["excess"] >= scale:
+                r["tag"] = "buy"     # 相對同儕被追 → 買方挑戰
+
+
+TAG_TXT = {"sell": "賣方築牆", "buy": "買方追價", "": "中性"}
+
+# 一側價外合計成交量低於此數，就不把口數最大的履約價當成牆
+MIN_ZONE_VOL = 500
+
+# 超額顯著門檻 = EXCESS_K × |超額|中位數。
+# 1.0 太鬆：1 MAD ≈ 0.67σ，統計上約一半的履約價都會超過，標記滿版等於沒標。
+# 2.0 ≈ 1.35σ，只有約兩成會亮燈，標到的才是真的異常。
+EXCESS_K = 2.0
+
+# 價內／價外分組後，一組有效樣本少於此數就整組不判定
+MIN_GROUP_N = 5
+
+# 超額門檻的絕對下限（百分點）。純自適應會在同質性高的組裡失控：
+# 價外買權有時 30 檔全部同步跌 -50~-56%，MAD 只有 1pt，門檻自動縮到 ±2pt，
+# 於是連報價跳動的雜訊都會被判成「買方追價」。低於這個幅度的超額沒有解讀價值。
+MIN_EXCESS_PT = 5.0
+
+# 單一履約價要被判買賣方，至少要有的成交口數（絕對下限）
+MIN_TAG_VOL = 50
+
+
+def build_zone(crows, prows, under, oi, lo, hi, top=3):
+    """
+    盤中撐壓：用「今日累積成交口數」的分布抓牆的位置。
+
+    為什麼排序用口數而不是金額：這張卡片要跟昨日 OI 牆對照，而 OI 的單位就是口數，
+    用金額排就是拿兩把尺在比。更實際的問題是金額 = 權利金×50×口數，權利金隨著
+    接近價平而變大，用金額排幾乎必然選出離標的最近的那一檔 —— 那是價平的定義，
+    不是市場押注的位置。口數才是部位規模，也才是「牆有多高」。
+    金額仍然並列顯示，看的是資金投入強度，兩個問題分兩欄回答。
+
+    範圍限制在畫面的 ±radius 視窗內，順便壓掉深價外樂透票對口數的灌水。
+    再用 add_excess 的 tag 標記那道牆是賣方在築（硬）還是買方在打（可能破）。
+    """
+    def pick(rows, keep):
+        cand = [r for r in rows.values() if keep(r["K"]) and r["vol"] > 0]
+        cand.sort(key=lambda r: r["vol"], reverse=True)
+        return cand[:top], sum(r["vol"] for r in cand)
+
+    res, res_vol = pick(crows, lambda k: k >= under)      # 壓力：價外買權
+    sup, sup_vol = pick(prows, lambda k: k <= under)      # 支撐：價外賣權
+
+    # 量能門檻：剛掛牌的週選一側常只有個位數口成交，那種「牆」是雜訊。
+    # 寧可標成量能不足也不要給一個看起來很篤定的價位。
+    res_thin = res_vol < MIN_ZONE_VOL
+    sup_thin = sup_vol < MIN_ZONE_VOL
+
+    # OI 牆要跟盤中重心放在同一個尺上比，否則會憑空生出「移動了三千點」的假訊號：
+    #   1. 限制在標的同一側
+    #   2. 限制在畫面顯示的 ±radius 視窗內 —— 台指深價外買權長年有賣方遠期收租的
+    #      巨量存量 OI（例如標的 42,300 時最大 OI 在 46,500），那不是今天的壓力。
+    def wall_of(d, keep):
+        c = {k: v for k, v in d.items() if lo <= k <= hi and keep(k) and v > 0}
+        return max(c, key=lambda k: c[k]) if c else None
+
+    c_wall = wall_of(oi["C"], lambda k: k >= under) if oi else None
+    p_wall = wall_of(oi["P"], lambda k: k <= under) if oi else None
+    return {
+        "res": res, "sup": sup,
+        "res_vol": res_vol, "sup_vol": sup_vol,
+        "res_thin": res_thin, "sup_thin": sup_thin,
+        "res_k": res[0]["K"] if (res and not res_thin) else None,
+        "sup_k": sup[0]["K"] if (sup and not sup_thin) else None,
+        "c_wall": c_wall, "p_wall": p_wall,
+        # 盤中金額第一名 vs 昨日同側 OI 牆差幾點；差距大代表牆在移動
+        "res_shift": (res[0]["K"] - c_wall) if (res and c_wall and not res_thin) else None,
+        "sup_shift": (sup[0]["K"] - p_wall) if (sup and p_wall and not sup_thin) else None,
+    }
+
+
 def build_report(gkey, grp, session, under, usrc, tab_id, tab_name, radius=1500):
     """把單一到期別（一個分頁）的資料整理成畫面要的形狀。"""
     root, mon, yr = gkey
@@ -361,10 +510,15 @@ def build_report(gkey, grp, session, under, usrc, tab_id, tab_name, radius=1500)
         px, vol = d["px"], d["vol"]
         return {"K": k, "px": px, "vol": vol, "amt": int(px * 50 * vol),
                 "be": (k + px) if is_call else (k - px),
-                "bid": d["bid"], "ask": d["ask"]}
+                "bid": d["bid"], "ask": d["ask"],
+                "rate": d["rate"], "diff": d["diff"], "ref": d["ref"]}
 
     crows = {k: mk(calls, k, True)  for k in strikes if mk(calls, k, True)}
     prows = {k: mk(puts,  k, False) for k in strikes if mk(puts,  k, False)}
+
+    add_excess(crows, under, True)
+    add_excess(prows, under, False)
+    zone = build_zone(crows, prows, under, oi, lo, hi)
 
     # MIS CTime 例 213907 → 21:39:07；非今日的資料把日期一起標出來，
     # 免得像 07/31 早上那次：產生時間是今天早上、行情時間卻是昨晚而看不出來。
@@ -381,7 +535,7 @@ def build_report(gkey, grp, session, under, usrc, tab_id, tab_name, radius=1500)
         "under": under, "usrc": usrc, "atm": atm, "fwd": fwd,
         "strikes": strikes, "crows": crows, "prows": prows,
         "oi": oi, "time": tstr, "stale": stale, "expiry": expiry,
-        "vol": grp["vol"],
+        "vol": grp["vol"], "zone": zone,
     }
 
 
@@ -420,9 +574,25 @@ def build_page(radius=1500):
 # ── 5. HTML 產出 ─────────────────────────────────────────────────────────────
 
 def heat(amt, mx, base):
+    """金額格背景：熱度（資金強度），開 0.55 次方壓縮讓中小值也看得見。"""
     t = (amt / mx) ** 0.55 if mx else 0
     r, g, b = base
     return f"rgb({int(255+(r-255)*t)},{int(255+(g-255)*t)},{int(255+(b-255)*t)})"
+
+
+def bar(vol, mx, base, to_left):
+    """
+    口數格背景畫成成交口數分布條：CALL 由右往左長、PUT 由左往右長，
+    以履約價欄為中軸，整張表就是一張左右對開的盤中部位分布圖。
+    刻意用線性比例（不像熱度圖壓縮），分布圖要能直接目測倍數關係 ——
+    這欄回答「牆有多高」，隔壁金額欄回答「押了多少錢」。
+    """
+    t = (vol / mx) if mx else 0
+    pct = max(0.0, min(100.0, t * 100))
+    r, g, b = base
+    d = "left" if to_left else "right"
+    return (f"background:linear-gradient(to {d},"
+            f"rgba({r},{g},{b},.42) 0 {pct:.1f}%,transparent {pct:.1f}% 100%)")
 
 CALL_BASE = (214, 52, 52)
 PUT_BASE  = (30, 160, 70)
@@ -484,12 +654,80 @@ setTimeout(function(){
 """
 
 
+def money(a):
+    """金額用億／萬顯示；盤中動輒上億，逐位數字反而讀不出量級。"""
+    return f"{a/1e8:.2f} 億" if a >= 1e8 else f"{a/1e4:,.0f} 萬"
+
+
+def chg_td(r):
+    """今日漲跌%（相對昨收）。底色標的是『超額』而非漲跌本身：
+    綠＝相對同側同儕被壓（賣方築牆）、紅＝被追價（買方挑戰）。"""
+    rate = r.get("rate")
+    if rate is None:
+        return '<td class="chg"></td>'
+    tag = r.get("tag", "")
+    ex  = r.get("excess")
+    g   = MONEY_TXT.get(r.get("grp", ""), "")
+    tip = (f'今日 {rate:+.0f}%，對照{g}同儕超額 {ex:+.0f}pt → {TAG_TXT[tag]}'
+           if ex is not None else f'今日 {rate:+.0f}%（樣本不足或無成交，不判定）')
+    return f'<td class="chg {tag}" title="{tip}">{rate:+.0f}%</td>'
+
+
+def render_zone(rep):
+    """盤中撐壓卡片：今日成交金額分布抓出來的牆，並與昨日 OI 牆對照。"""
+    z = rep["zone"]
+    if not z:
+        return ""
+
+    def rows(items, thin, vol):
+        if thin:
+            return (f'<div class="zrow thin"><span class="zm">量能不足（此側價外合計 {vol:,} 口），'
+                    f'不做撐壓判讀</span></div>')
+        out = []
+        for r in items:
+            tag = r.get("tag", "")
+            rt  = f'{r["rate"]:+.0f}%' if r.get("rate") is not None else "—"
+            out.append(
+                f'<div class="zrow"><b>{r["K"]:,}</b>'
+                f'<span class="zm">{r["vol"]:,} 口</span>'
+                f'<span class="zv">{money(r["amt"])}</span>'
+                f'<span class="zr {tag}">{rt}</span>'
+                f'<span class="zt {tag}">{TAG_TXT[tag]}</span></div>')
+        return "\n".join(out) or '<div class="zrow"><span class="zm">此側無成交</span></div>'
+
+    def note(shift, wall, label):
+        # 這裡的 OI 牆已限定在標的同一側，跟盤中重心是可比的範圍
+        if wall is None:
+            return f'昨日 {label} OI 牆：視窗內無資料'
+        if shift is None:
+            return f'昨日 {label} OI 牆 {wall:,}'
+        if abs(shift) <= 100:
+            return f'昨日 {label} OI 牆 {wall:,}　·　盤中重心與其一致'
+        d = "上移" if shift > 0 else "下移"
+        return f'昨日 {label} OI 牆 {wall:,}　·　盤中重心{d} {abs(shift):,} 點'
+
+    return f'''<div class="zones">
+  <div class="zone res">
+    <div class="zh">盤中壓力區<small>標的之上・買權今日成交口數</small></div>
+    {rows(z["res"], z["res_thin"], z["res_vol"])}
+    <div class="zn">{note(z["res_shift"], z["c_wall"], "買權")}</div>
+  </div>
+  <div class="zone sup">
+    <div class="zh">盤中支撐區<small>標的之下・賣權今日成交口數</small></div>
+    {rows(z["sup"], z["sup_thin"], z["sup_vol"])}
+    <div class="zn">{note(z["sup_shift"], z["p_wall"], "賣權")}</div>
+  </div>
+</div>'''
+
+
 def render_panel(rep):
     """單一到期別（一個分頁）的 KPI + T 字表 + 說明。"""
     tid = rep["id"]
     crows, prows = rep["crows"], rep["prows"]
-    cmax = max((r["amt"] for r in crows.values()), default=1)
-    pmax = max((r["amt"] for r in prows.values()), default=1)
+    cmax  = max((r["amt"] for r in crows.values()), default=1)
+    pmax  = max((r["amt"] for r in prows.values()), default=1)
+    cvmax = max((r["vol"] for r in crows.values()), default=1)
+    pvmax = max((r["vol"] for r in prows.values()), default=1)
     c_vol = sum(r["vol"] for r in crows.values())
     p_vol = sum(r["vol"] for r in prows.values())
     c_amt = sum(r["amt"] for r in crows.values())
@@ -517,27 +755,29 @@ def render_panel(rep):
         c_oiv = oi["C"].get(k) if oi else None
         p_oiv = oi["P"].get(k) if oi else None
         if c:
-            bg = heat(c["amt"], cmax, CALL_BASE)
-            cc = (f'<td class="amt" data-tab="{tid}" data-side="C" data-k="{k}" data-amt="{c["amt"]}" style="background:{bg}">'
+            cc = (f'<td class="amt" data-tab="{tid}" data-side="C" data-k="{k}" data-amt="{c["amt"]}" '
+                  f'style="background:{heat(c["amt"], cmax, CALL_BASE)}">'
                   f'<span class="amtnum">{fmt(c["amt"])}</span><span class="delta"></span></td>'
-                  f'<td class="vol">{fmt(c["vol"])}</td>'
+                  f'<td class="vol" style="{bar(c["vol"], cvmax, CALL_BASE, True)}">{fmt(c["vol"])}</td>'
                   f'<td class="oi">{fmt(c_oiv) if c_oiv else ""}</td>'
+                  f'{chg_td(c)}'
                   f'<td class="px" data-tab="{tid}" data-side="C" data-k="{k}" data-px="{c["px"]:g}">'
                   f'<span class="pxnum">{c["px"]:g}</span><span class="delta plain"></span></td>'
                   f'<td class="be">{c["be"]:,.0f}</td>')
         else:
-            cc = '<td class="e"></td>'*5
+            cc = '<td class="e"></td>'*6
         if p:
-            bg = heat(p["amt"], pmax, PUT_BASE)
             pc = (f'<td class="be">{p["be"]:,.0f}</td>'
                   f'<td class="px" data-tab="{tid}" data-side="P" data-k="{k}" data-px="{p["px"]:g}">'
                   f'<span class="pxnum">{p["px"]:g}</span><span class="delta plain"></span></td>'
+                  f'{chg_td(p)}'
                   f'<td class="oi">{fmt(p_oiv) if p_oiv else ""}</td>'
-                  f'<td class="vol">{fmt(p["vol"])}</td>'
-                  f'<td class="amt" data-tab="{tid}" data-side="P" data-k="{k}" data-amt="{p["amt"]}" style="background:{bg}">'
+                  f'<td class="vol" style="{bar(p["vol"], pvmax, PUT_BASE, False)}">{fmt(p["vol"])}</td>'
+                  f'<td class="amt" data-tab="{tid}" data-side="P" data-k="{k}" data-amt="{p["amt"]}" '
+                  f'style="background:{heat(p["amt"], pmax, PUT_BASE)}">'
                   f'<span class="amtnum">{fmt(p["amt"])}</span><span class="delta"></span></td>')
         else:
-            pc = '<td class="e"></td>'*5
+            pc = '<td class="e"></td>'*6
         trs.append(f'<tr class="drow{atm_cls}">{cc}<td class="strike">{k:,}</td>{pc}</tr>')
     rows_html = "\n".join(trs)
 
@@ -575,12 +815,13 @@ def render_panel(rep):
   <div class="kpi"><div class="l">P/C 未平倉比</div><div class="v">{pcr_oi_kpi}</div></div>
   <div class="kpi"><div class="l">價平</div><div class="v">{rep["atm"]:,}</div></div>
 </div>
+{render_zone(rep)}
 <div class="tblwrap">
 <table>
 <thead><tr>
-  <th class="grp-c">CALL 金額</th><th class="grp-c">口數</th><th class="grp-c">OI</th><th class="grp-c">權利金</th><th class="grp-c">損益兩平</th>
+  <th class="grp-c">CALL 金額</th><th class="grp-c">口數</th><th class="grp-c">OI</th><th class="grp-c">今日</th><th class="grp-c">權利金</th><th class="grp-c">損益兩平</th>
   <th>履約價</th>
-  <th class="grp-p">損益兩平</th><th class="grp-p">權利金</th><th class="grp-p">OI</th><th class="grp-p">口數</th><th class="grp-p">PUT 金額</th>
+  <th class="grp-p">損益兩平</th><th class="grp-p">權利金</th><th class="grp-p">今日</th><th class="grp-p">OI</th><th class="grp-p">口數</th><th class="grp-p">PUT 金額</th>
 </tr></thead>
 <tbody>
 {rows_html}
@@ -663,8 +904,21 @@ h1{{font-size:20px;margin:0 0 4px;font-weight:700;letter-spacing:.3px}}
 .kpi .l{{font-size:10.5px;color:var(--muted);letter-spacing:.4px;margin-bottom:4px}}
 .kpi .v{{font-size:18px;font-weight:700}} .kpi .v small{{font-size:11px;font-weight:500;color:var(--muted)}}
 .kpi.call .v{{color:var(--call)}} .kpi.put .v{{color:var(--put)}}
+.zones{{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 14px}}
+@media(max-width:640px){{.zones{{grid-template-columns:1fr}}}}
+.zone{{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px}}
+.zone.res{{border-left:3px solid var(--call)}} .zone.sup{{border-left:3px solid var(--put)}}
+.zh{{font-size:12px;font-weight:700;margin-bottom:7px}}
+.zh small{{font-weight:500;color:var(--muted);font-size:10.5px;margin-left:7px}}
+.zrow{{display:flex;align-items:baseline;gap:8px;font-size:12px;padding:3px 0;flex-wrap:wrap}}
+.zrow b{{font-size:14px;min-width:58px}}
+.zm{{color:var(--ink);min-width:56px}} .zv,.zr,.zt{{color:var(--muted);font-size:11px}}
+.zr.sell,.zt.sell{{color:var(--put)}} .zr.buy,.zt.buy{{color:var(--call)}}
+.zt{{margin-left:auto;font-weight:600}}
+.zrow.thin .zm{{color:var(--muted);font-size:11.5px}}
+.zn{{color:var(--muted);font-size:10.5px;margin-top:7px;padding-top:7px;border-top:1px solid var(--hair)}}
 .tblwrap{{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px}}
-table{{border-collapse:collapse;width:100%;font-size:12.5px;min-width:860px}}
+table{{border-collapse:collapse;width:100%;font-size:12.5px;min-width:960px}}
 thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-weight:600;
   font-size:10.5px;letter-spacing:.3px;padding:8px 7px;border-bottom:2px solid var(--line)}}
 .grp-c{{color:var(--call)}} .grp-p{{color:var(--put)}}
@@ -672,6 +926,9 @@ thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-
 .strike{{text-align:center!important;font-weight:700;background:var(--bg);
   border-left:1px solid var(--line);border-right:1px solid var(--line)}}
 .be,.oi{{color:var(--muted)}} .px{{font-weight:600}}
+.chg{{font-size:11px;color:var(--muted)}}
+.chg.sell{{color:var(--put);font-weight:700;background:rgba(30,160,70,.13)}}
+.chg.buy{{color:var(--call);font-weight:700;background:rgba(214,52,52,.13)}}
 .amt .amtnum{{display:block}} .px .pxnum{{display:block}}
 .delta{{display:none;font-size:9.5px;font-weight:700;line-height:1.4;margin-top:1px;
   padding:0 4px;border-radius:3px;background:rgba(0,0,0,.34);letter-spacing:.2px}}
@@ -702,19 +959,31 @@ thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-
 </div>
 {panels_html}
 <div class="legend">
-  <span><span class="sw" style="background:linear-gradient(90deg,#fff,rgb(214,52,52))"></span>買權金額</span>
-  <span><span class="sw" style="background:linear-gradient(90deg,#fff,rgb(30,160,70))"></span>賣權金額</span>
+  <span><span class="sw" style="background:linear-gradient(90deg,transparent,rgba(214,52,52,.42))"></span>買權口數分布（由右往左）</span>
+  <span><span class="sw" style="background:linear-gradient(90deg,rgba(30,160,70,.42),transparent)"></span>賣權口數分布（由左往右）</span>
+  <span><span class="sw" style="background:linear-gradient(90deg,#fff,rgb(214,52,52))"></span>金額熱度</span>
   <span><span class="sw" style="background:var(--atm);border:1px solid #d8b24a"></span>價平</span>
   <span><b style="color:#ff6a5c">▲</b> 較上一版增加　<b style="color:#37d67a">▼</b> 較上一版減少（金額與權利金皆有）</span>
   <span>網頁每 60 秒自動重新整理</span>
 </div>
 <div class="note">
-  <b>即時欄位</b>（MIS）：權利金、口數、金額、損益兩平；金額 = 權利金 × 50 × 口數。<br>
-  <b>誰在發動</b>：金額 ▲ + 權利金 ▲ = 買方（BC／BP）追價；金額 ▲ + 權利金 ▼ = 賣方（SC／SP）壓價收租，
-  該履約價多半在築牆；金額 ▼ = 部位退場，原本的牆可能鬆動。<br>
+  <b>即時欄位</b>（MIS）：權利金、口數、金額、今日漲跌、損益兩平；金額 = 權利金 × 50 × 口數，為今日累積。<br>
+  <b>盤中撐壓怎麼來的</b>：OI 盤中不更新，所以牆的位置改用<b>今日累積成交口數</b>抓 ——
+  壓力取標的之上口數最大的買權、支撐取標的之下口數最大的賣權，範圍限在畫面的 ±1,500 點視窗內。
+  用口數而非金額，是因為要跟 OI 牆對照，而 OI 的單位就是口數；而且金額 = 權利金×50×口數，
+  權利金隨著接近價平而變大，用金額排幾乎必然選出離標的最近那一檔，那是價平的定義而非市場押注的位置。
+  口數欄的分布條回答「牆有多高」，金額欄的熱度回答「押了多少錢」。
+  一側價外合計不足 500 口時直接標示量能不足，不硬給價位。<br>
+  <b>賣方築牆／買方追價</b>：直接看漲跌%會誤判 —— 指數一漲，全部買權一起漲、全部賣權一起跌，那是方向 beta。
+  本表扣掉<b>同側所有履約價漲跌%的中位數</b>，剩下的「超額」才是這一檔相對同儕的異常強弱：
+  跌得比同儕兇（綠）＝有人壓價收租，牆較硬；漲得比同儕兇（紅）＝有人追價，該價位可能被挑戰。
+  顯著門檻用超額絕對值的中位數自適應，不是固定值。<br>
+  <b>牆在移動</b>：卡片下緣比對盤中金額重心與昨日 OI 牆。兩者背離超過 100 點，代表今天的資金押在別的價位，
+  昨日那道支撐壓力已經不是同一個位置。<br>
   <b>分頁</b>：兩個分頁是不同結算日的合約（週三＝W 系列或月選、週五＝F 系列），
   各自獨立計算量比、價平與 ▲▼ 增減；切換後的選擇會記住，自動重整不會跳回去。<br>
-  <b>限制</b>：OI 為期交所盤後公布，盤中沿用前一日；此表為 TAIFEX MIS 約每 5 秒的準即時報價，非逐筆。
+  <b>限制</b>：OI 為期交所盤後公布，盤中沿用前一日；成交金額只知道成交，不知道那一口是新倉還是平倉，
+  所以「築牆」是傾向推論而非事實。此表為 TAIFEX MIS 約每 5 秒的準即時報價，非逐筆。
 </div>
 </div>''' + TAB_JS + DELTA_JS
 
@@ -743,20 +1012,34 @@ def push_ntfy(page, page_url=None):
     # 推播沒有「上一版」可比，做不到網頁的 ▲▼；改帶絕對數字，
     # 讓手機上不開網頁也看得出牆在哪個履約價、押了多重。
     def wall(label, r):
+        # 帶上今日漲跌%與買賣方研判，手機上不開網頁也看得出這道牆硬不硬
+        rt = f"　今日 {r['rate']:+.0f}%（{TAG_TXT.get(r.get('tag',''),'')}）" if r.get("rate") is not None else ""
         return (f"{label} {r['K']:,}（{r['vol']:,}口）"
-                f"　權利金 {r['px']:g}　金額 {r['amt']/10000:,.0f}萬")
+                f"　權利金 {r['px']:g}　金額 {money(r['amt'])}{rt}")
     for rep in reps:                      # 週三／週五各一段
         crows, prows = rep["crows"], rep["prows"]
         c_vol = sum(r["vol"] for r in crows.values())
         p_vol = sum(r["vol"] for r in prows.values())
         pcr_v = (p_vol / c_vol) if c_vol else 0
-        c_top = max(crows.values(), key=lambda r: r["vol"], default=None)
-        p_top = max(prows.values(), key=lambda r: r["vol"], default=None)
         e = rep["expiry"]
+        z = rep["zone"]
         lines.append(f"── {rep['tab']} {e[4:6]}/{e[6:8]}（{rep['series']}）　價平 {rep['atm']:,}")
         lines.append(f"CALL {c_vol:,}口 / PUT {p_vol:,}口　P/C量比 {pcr_v:.2f}")
-        if c_top: lines.append(wall("買權最大量", c_top))
-        if p_top: lines.append(wall("賣權最大量", p_top))
+        # 只推盤中撐壓。以前另外推的「買權／賣權最大量」現在跟撐壓同樣以口數排序，
+        # 幾乎必然是同一檔，徒增重複；更糟的是量能不足時撐壓已被擋掉，
+        # 那兩行卻會把只有個位數口的雜訊從後門推出來。
+        if z and (z["sup_k"] or z["res_k"]):
+            sup = f"{z['sup_k']:,}" if z["sup_k"] else "—"
+            res = f"{z['res_k']:,}" if z["res_k"] else "—"
+            lines.append(f"盤中撐壓　支撐 {sup}　壓力 {res}")
+        if z and z["res"] and not z["res_thin"]:
+            lines.append(wall("盤中壓力", z["res"][0]))
+        elif z and z["res_thin"]:
+            lines.append(f"盤中壓力　量能不足（價外合計 {z['res_vol']:,} 口）")
+        if z and z["sup"] and not z["sup_thin"]:
+            lines.append(wall("盤中支撐", z["sup"][0]))
+        elif z and z["sup_thin"]:
+            lines.append(f"盤中支撐　量能不足（價外合計 {z['sup_vol']:,} 口）")
     body = "\n".join(lines)
     headers = {"Title": "選擇權即時 T 字報價".encode("utf-8"), "Tags": "chart_with_upwards_trend"}
     if page_url:
