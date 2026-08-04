@@ -568,6 +568,9 @@ def build_page(radius=1500):
     return {
         "session": session, "under": under, "usrc": usrc, "reps": reps,
         "now": datetime.now(TW_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+        # 給網頁算「資料幾分鐘前」用。存 epoch 秒而非字串，才不會因為看的人
+        # 所在時區不同而把台北時間誤判成當地時間。
+        "epoch": int(datetime.now(TW_TZ).timestamp()),
     }
 
 
@@ -645,6 +648,26 @@ DELTA_JS = """
     s.className = 'delta' + (isAmt ? '' : ' plain') + (d > 0 ? ' up' : ' down');
     s.style.display = 'inline-block';
   });
+})();
+// 顯示「這份資料是幾分鐘前抓的」。雲端排程會被 GitHub 跳過，光看產生時間不容易
+// 察覺已經停更很久，所以每 10 秒重算一次年齡：15 分鐘以上轉黃、40 分鐘以上轉紅。
+(function(){
+  var el = document.getElementById('age');
+  var wrap = document.querySelector('.wrap');
+  if(!el || !wrap) return;
+  var epoch = parseInt(wrap.getAttribute('data-epoch') || '0', 10);
+  if(!epoch) return;
+  function tick(){
+    var sec = Math.max(0, Math.floor(Date.now()/1000) - epoch);
+    var txt;
+    if(sec < 60)            txt = sec + ' 秒前';
+    else if(sec < 3600)     txt = Math.floor(sec/60) + ' 分鐘前';
+    else                    txt = Math.floor(sec/3600) + ' 小時 ' + Math.floor((sec%3600)/60) + ' 分前';
+    el.textContent = '資料 ' + txt;
+    el.className = sec >= 2400 ? 'dead' : (sec >= 900 ? 'stale' : '');
+  }
+  tick();
+  setInterval(tick, 10000);
 })();
 // 每 60 秒帶時間戳重新載入：繞過 iPhone 主畫面 App 與 CDN 的快取，永遠抓最新那版。
 setTimeout(function(){
@@ -894,6 +917,10 @@ body{{margin:0;background:var(--bg);color:var(--ink);
 .wrap{{max-width:1080px;margin:0 auto;padding:24px 14px 60px;}}
 h1{{font-size:20px;margin:0 0 4px;font-weight:700;letter-spacing:.3px}}
 .sub{{color:var(--muted);font-size:12.5px;margin-bottom:6px;line-height:1.6}}
+/* 資料新鮮度：雲端排程常被 GitHub 跳過，這裡讓「這份資料多舊」一眼可見 */
+#age{{font-weight:600}}
+#age.stale{{color:#d8b24a}}
+#age.dead{{color:#ff6a5c}}
 .dot{{display:inline-block;width:8px;height:8px;border-radius:50%;background:{dot};margin-right:6px;
   vertical-align:middle;animation:pulse 1.6s infinite}}
 @keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.35}}}}
@@ -951,9 +978,9 @@ thead th{{position:sticky;top:0;background:var(--panel);color:var(--muted);font-
 .sub-tab{{margin:0 2px 4px}}
 .panel{{display:none}} .panel.on{{display:block}}
 </style>
-<div class="wrap" data-gen="{page["now"]}">
+<div class="wrap" data-gen="{page["now"]}" data-epoch="{page["epoch"]}">
 <h1>台指選擇權即時 T 字報價</h1>
-<div class="sub"><span class="dot"></span>{sess_txt}　·　標的 {page["under"]:,.0f}（{page["usrc"]}）　·　產生 {page["now"]}</div>
+<div class="sub"><span class="dot"></span>{sess_txt}　·　標的 {page["under"]:,.0f}（{page["usrc"]}）　·　產生 {page["now"]}　·　<span id="age">—</span></div>
 <div class="tabs">
   {tabs_html}
 </div>

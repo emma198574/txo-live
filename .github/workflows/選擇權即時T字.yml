@@ -3,11 +3,17 @@ name: 選擇權即時T字報價
 # 台北時間對照（GitHub cron 用 UTC，UTC+8）：
 #   日盤 08:45–13:45 → UTC 00:45–05:45
 #   夜盤 15:00–次日05:00 → UTC 07:00–21:00（同一 UTC 日）
-# 網頁每 5 分鐘自動更新；推播僅在手動觸發（workflow_dispatch）時發送。
+#
+# 排程間隔為何是 10 分鐘、而且分鐘數這麼怪：
+#   GitHub 的 schedule 只是「盡力而為」，高負載時會直接丟掉整次排程。
+#   原本設 '*/5'（每小時 12 次）實測被丟掉九成，實際只有 1～2 小時才跑到一次。
+#   整點與 5 的倍數是全球排程最壅塞的時刻，所以改成每 10 分鐘、且刻意錯開到
+#   4/14/24… 這種沒人搶的分鐘，提高真的被排到的機率。
+# 推播僅在手動觸發（workflow_dispatch）時發送。
 on:
   schedule:
-    - cron: '*/5 0-5 * * 1-5'     # 日盤
-    - cron: '*/5 7-21 * * 1-5'    # 夜盤
+    - cron: '4,14,24,34,44,54 0-5 * * 1-5'     # 日盤
+    - cron: '4,14,24,34,44,54 7-21 * * 1-5'    # 夜盤
   workflow_dispatch:
     inputs:
       notify:
@@ -28,6 +34,9 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # 正常一次 30～50 秒就跑完。設上限是避免某次卡在網路等待，
+    # 一路佔住 pages 這個 concurrency group，把後面每一次排程都堵在後面排隊。
+    timeout-minutes: 8
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
