@@ -10,6 +10,13 @@ name: 選擇權即時T字報價
 #   提高真的被排到的機率。
 #
 # 分工：排程只更新網頁；要即時數據時到 Actions 手動 Run，預設會一起推播到手機。
+#
+# ── 為什麼不用 actions/deploy-pages ──
+# 2026-08-06 起這個站台的 artifact 部署管線卡死：deployment 建得出來但永遠停在
+# deployment_queued，連砍掉站台重建都一樣（實測連續 115 次輪詢狀態不動，最後逾時）。
+# 改走 Pages 的分支建置管線（Settings → Pages → Source 選 Deploy from a branch，
+# 分支 gh-pages、資料夾 /root），完全不經過 artifact 那條路。
+# gh-pages 每次都用單一 commit 強制覆蓋，所以 repo 不會被幾十次／天的更新撐大。
 on:
   schedule:
     - cron: '2,17,32,47 0-5 * * 1-5'     # 日盤
@@ -22,26 +29,16 @@ on:
         default: true
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# 同時只跑一個部署；不取消進行中的（部署很快，15 分鐘間隔足夠）
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build-and-publish:
     runs-on: ubuntu-latest
-    # 正常一次 30～50 秒就跑完。設上限是避免某次卡在網路等待，
-    # 一路佔住 pages 這個 concurrency group，把後面每一次排程都堵在後面排隊。
-    # 抓 12 分鐘是為了讓 deploy-pages 自己那 10 分鐘的等待跑完再放棄——設 8 分鐘會
-    # 在它還在等 Pages 回應時就把 job 砍掉，log 只留下一句 canceled，看不出真正卡在哪。
-    timeout-minutes: 12
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -59,10 +56,19 @@ jobs:
         run: |
           python3 "即時選擇權T字報價.py" --out public/index.html ${{ (github.event_name == 'workflow_dispatch' && inputs.notify) && '--notify' || '' }}
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
-
-      - id: deploy
-        uses: actions/deploy-pages@v4
+      - name: 發佈到 gh-pages 分支
+        run: |
+          set -e
+          # .nojekyll：不讓 Pages 拿 Jekyll 去處理，純靜態直接上。
+          touch public/.nojekyll
+          cd public
+          git init -q
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "更新 T 字報價網頁 $(TZ=Asia/Taipei date '+%Y-%m-%d %H:%M')"
+          # 強制覆蓋成單一 commit：每次都是全新 SHA（Pages 才會重新建置），
+          # 又不會累積歷史把 repo 撐大。
+          git push -q --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            HEAD:gh-pages
