@@ -36,7 +36,9 @@ jobs:
     runs-on: ubuntu-latest
     # 正常一次 30～50 秒就跑完。設上限是避免某次卡在網路等待，
     # 一路佔住 pages 這個 concurrency group，把後面每一次排程都堵在後面排隊。
-    timeout-minutes: 8
+    # 抓 12 分鐘是為了讓 deploy-pages 自己那 10 分鐘的等待跑完再放棄——設 8 分鐘會
+    # 在它還在等 Pages 回應時就把 job 砍掉，log 只留下一句 canceled，看不出真正卡在哪。
+    timeout-minutes: 12
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -62,21 +64,5 @@ jobs:
         with:
           path: public
 
-      # ── 為什麼要自己算一個版本號 ──
-      # actions/deploy-pages 預設拿 commit SHA 當 pages_build_version。這個 repo 的
-      # commit 幾乎不會變（網頁是每次 run 現抓現產的，不進版控），於是每次送出去的
-      # 版本號都是同一個，Pages 判定「已經是這版了」就不換檔——deployment 照樣回報
-      # success，網址上的檔案卻還是舊的。
-      # 2026-08-06 實測：20:37、20:44 兩次手動部署都 success，線上整整 44 分鐘停在
-      # 19:51 那份不動（etag 大小一路不變，回源重抓也一樣）。
-      # 這裡用 run_id + 重跑次數 + 當下秒數雜湊出一個獨一無二的假 SHA，
-      # 逼 Pages 每次都認定是新版本、確實重新上架。
-      - name: 產生本次部署的版本號
-        id: ver
-        run: |
-          echo "sha=$(printf '%s' "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$(date +%s)" | sha1sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-
       - id: deploy
         uses: actions/deploy-pages@v4
-        env:
-          GITHUB_SHA: ${{ steps.ver.outputs.sha }}
